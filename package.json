@@ -1,7 +1,7 @@
 {
   "name": "dsh-conversation-nav",
   "version": "0.1.0",
-  "description": "Add circular conversation navigation controls for top, previous user message, next user message, and bottom.",
+  "description": "为 DSH Web 对话区提供回到顶部、上一条用户消息、下一条用户消息、回到底部的圆形导航按钮，自动处理更早历史分页。Circular conversation navigation controls for DSH Web.",
   "keywords": ["dsh", "dsh-plugin", "conversation", "navigation", "chat", "ui", "deepseek-harness"],
   "type": "module",
   "main": "./index.mjs",
