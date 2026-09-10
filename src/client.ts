@@ -64,13 +64,28 @@ export function apply(ctx: any): void {
   const pendingTimeouts = new Set<number>()
   const pendingIntervals = new Set<number>()
 
-  ctx.effect(() => {
+  /**
+   * Re-install the rail stylesheet when it is absent. Disposal removes the style
+   * node while the rail component can already be mounted (the renderer's slot
+   * entry and this fiber refresh independently, e.g. under the dev-mode HMR
+   * driver), and nothing else would put it back until the next `apply`: the rail
+   * would sit unstyled at the top-left and the product's own "to bottom" button
+   * would reappear. Called every tick, so the style heals on the next 100ms
+   * sample at the latest.
+   */
+  function ensureStyle(): void {
+    if (document.querySelector('style[data-dsh-conversation-nav]')) return
     const style = document.createElement('style')
     style.dataset.dshConversationNav = ''
     style.textContent = CSS
     document.head.appendChild(style)
+  }
+
+  ctx.effect(() => {
+    ensureStyle()
     return () => {
-      style.remove()
+      const style = document.querySelector('style[data-dsh-conversation-nav]')
+      if (style) style.remove()
       for (const handle of pendingTimeouts) window.clearTimeout(handle)
       pendingTimeouts.clear()
       for (const handle of pendingIntervals) window.clearInterval(handle)
@@ -311,12 +326,14 @@ export function apply(ctx: any): void {
 
     React.useLayoutEffect(() => {
       if (!current || !visible) return
+      ensureStyle()
       const scrollport = findScrollport()
       const rail = railRef.current
       if (scrollport && rail) positionRail(scrollport, rail)
     }, [current, visible])
 
     React.useEffect(() => {
+      ensureStyle()
       if (!current) return
 
       let attachedScrollport: HTMLElement | null = null
@@ -328,6 +345,7 @@ export function apply(ctx: any): void {
       const tick = (): void => {
         const scrollport = findScrollport()
         if (!scrollport) return
+        ensureStyle()
         const rail = railRef.current
 
         if (attachedScrollport !== scrollport) {

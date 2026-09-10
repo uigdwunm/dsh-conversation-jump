@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # From the prebuilt release tarball (nothing to build locally)
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.0/dsh-conversation-jump-0.1.0.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.1/dsh-conversation-jump-0.1.1.tgz
 ```
 
 Restart `dsh web` afterwards.
@@ -62,6 +62,7 @@ Button labels are Chinese (`回到顶部` / `上一个` / `下一个` / `回到�
 - **Targeting is attribute-based, not hash-based.** The scrollport is `[data-conversation-scroll]`, user messages are `[data-chat-anchor-key]` filtered by `data-chat-flow-kind`, and the composer seat is `[data-composer-seat]`. The built-in "to bottom" button is hidden by matching the stable `_toBottomSlot` class **suffix** rather than a CSS-module hash, so a DSH upgrade that rehashes class names does not break it.
 - **Paging drives the product's own control.** It locates the "load older" button inside `[data-chat-flow]` — the first button that is not inside a message row and precedes the first row — clicks it, then polls the anchor count until it grows. Attempts are bounded, so a host that never grows the list cannot spin forever.
 - **Only the `slots` seat is injected.** `cordis-plugin-timer` is host-only and absent in the web client, so the plugin declares `inject: ['slots']` and uses native `setTimeout` / `setInterval`, tracking every handle so disposal cancels them.
+- **The stylesheet heals itself.** It lives in a `<style data-dsh-conversation-nav>` node owned by the fiber, but every 100 ms sample checks the view and recreates the node when it is missing. A fiber re-apply that removes the styles (for example the dev-mode HMR driver rebuilding this plugin) therefore cannot leave the rail unstyled in the page's top-left corner with the product's own "to bottom" button reappearing while the rail is still mounted — it recovers on the next sample instead of needing a page refresh.
 - **Everything is cleaned up on unload**: the style element, every pending timer, and the scroll listener.
 
 ## Boundaries
@@ -132,7 +133,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # 从预构建 Release 包安装（无需本地构建）
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.0/dsh-conversation-jump-0.1.0.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.1/dsh-conversation-jump-0.1.1.tgz
 ```
 
 安装后重启 `dsh web` 生效。
@@ -168,6 +169,7 @@ dsh plugin --profile web add file:/绝对路径/dsh-conversation-jump
 - **定位基于数据属性而非哈希类名。** 滚动容器是 `[data-conversation-scroll]`，用户消息是 `[data-chat-anchor-key]` 并按 `data-chat-flow-kind` 过滤，输入区是 `[data-composer-seat]`。产品自带的“回到底部”按钮通过匹配稳定的 `_toBottomSlot` 类名**后缀**隐藏，而不是写死 CSS-module 哈希，因此 DSH 升级重新生成类名不会失效。
 - **翻页走产品自身的控件。** 在 `[data-chat-flow]` 中定位“加载更早”按钮（第一个不在消息行内、且位于首行之前的按钮）并点击它，然后轮询锚点数量直到增长；尝试次数有上限，宿主始终不增长列表时也不会空转。
 - **只注入 `slots` 一个席位。** `cordis-plugin-timer` 是纯 Host 服务，在 Web 端不存在，因此插件声明 `inject: ['slots']` 并使用原生 `setTimeout` / `setInterval`，同时记录每个句柄以便卸载时取消。
+- **样式会自愈。** 样式挂在 fiber 拥有的 `<style data-dsh-conversation-nav>` 节点上，但每 100ms 采样都会检查它是否还在，缺失就重新创建。因此当 fiber 被重新 apply 而移除样式时（例如 dev 模式下 HMR 重建本插件），不会出现“导航条仍挂着却变成页面左上角的无样式按钮、产品自带『回到底部』同时回来”的状态——下一个采样周期就恢复，不需要刷新页面。
 - **卸载时全部清理**：样式元素、所有待执行定时器、滚动监听。
 
 ### 边界
