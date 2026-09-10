@@ -1,12 +1,20 @@
 import * as React from 'react'
 
 export const name = 'dsh-conversation-jump-client'
-export const inject: string[] = []
+/**
+ * The web client has no `timer` service (cordis-plugin-timer is host-only), so
+ * only the slots seat is declared. Declaring it is mandatory: the web boot kernel
+ * creates every plugin fiber concurrently, so without this the fiber activates
+ * before `@deepseek-ai/dsh-client-ui-renderer` provides `slots` and `apply` would
+ * observe `ctx.get('slots') === undefined`.
+ */
+export const inject: string[] = ['slots']
 
 const SHOW_UP_SPEED_PX_PER_SECOND = 200
 const POSITION_SAMPLE_MS = 100
 const MESSAGE_ANCHOR_DIVISOR = 12
 const POSITION_EPSILON_PX = 4
+const AUTO_HIDE_MS = 5000
 
 const CSS = `
   .dsh-conv-nav {
@@ -40,30 +48,59 @@ const CSS = `
   .dsh-conv-nav__button:active { background: var(--dsw-alias-interactive-bg-hover-solid); }
   .dsh-conv-nav__button svg { display: block; }
   /* Hide the built-in "to bottom" floating button (replaced by our own "回到底部").
-     NOTE: .Md3f7G_toBottom is a product-internal CSS-module hash and may change across DSH upgrades. */
-  .Md3f7G_toBottom { display: none; }
+     NOTE: the CSS-module hash prefix changes across DSH upgrades, so match the
+     stable _toBottomSlot suffix instead of a hard-coded hash. !important is
+     required: the product rule .EvIC1a_toBottomSlot { display: flex } has the
+     very same 0-1-0 specificity, so which one wins would otherwise depend on
+     whether this style element lands before or after the ui-chat stylesheet. */
+  [class*='_toBottomSlot'] { display: none !important; }
 `
 
 export function apply(ctx: any): void {
   const slots = ctx.get('slots')
   if (!slots) return
 
-  const timer = ctx.get('timer')
   let suppressScrollCount = 0
+  const pendingTimeouts = new Set<number>()
+  const pendingIntervals = new Set<number>()
 
   ctx.effect(() => {
     const style = document.createElement('style')
     style.dataset.dshConversationNav = ''
     style.textContent = CSS
     document.head.appendChild(style)
-    return () => style.remove()
+    return () => {
+      style.remove()
+      for (const handle of pendingTimeouts) window.clearTimeout(handle)
+      pendingTimeouts.clear()
+      for (const handle of pendingIntervals) window.clearInterval(handle)
+      pendingIntervals.clear()
+    }
   }, 'dsh-conversation-jump: styles')
+
+  /** Native one-shot timer, tracked so dispose cancels anything still pending. */
+  function later(callback: () => void, delay: number): void {
+    const handle = window.setTimeout(() => {
+      pendingTimeouts.delete(handle)
+      callback()
+    }, delay)
+    pendingTimeouts.add(handle)
+  }
+
+  /** Native repeating timer; returns the stop handle the old `timer` service used to return. */
+  function every(callback: () => void, delay: number): () => void {
+    const handle = window.setInterval(callback, delay)
+    pendingIntervals.add(handle)
+    return () => {
+      pendingIntervals.delete(handle)
+      window.clearInterval(handle)
+    }
+  }
 
   function setScrollTop(el: HTMLElement, value: number): void {
     suppressScrollCount += 1
     el.scrollTop = value
-    if (timer) timer.timeout(() => { suppressScrollCount = Math.max(0, suppressScrollCount - 1) }, 100)
-    else suppressScrollCount = Math.max(0, suppressScrollCount - 1)
+    later(() => { suppressScrollCount = Math.max(0, suppressScrollCount - 1) }, 100)
   }
 
   function findScrollport(): HTMLElement | null {
@@ -109,15 +146,14 @@ export function apply(ctx: any): void {
   }
 
   function pollLoadOlder(scrollport: HTMLElement, onDone: () => void): void {
-    if (!timer) { onDone(); return }
     const before = scrollport.querySelectorAll('[data-chat-anchor-key]').length
     let attempts = 0
-    const stop = timer.interval(() => {
+    const stop = every(() => {
       attempts += 1
       const after = scrollport.querySelectorAll('[data-chat-anchor-key]').length
       if (after > before || attempts >= 60) {
         stop()
-        timer.timeout(onDone, 60)
+        later(onDone, 60)
       }
     }, 100)
   }
@@ -127,7 +163,7 @@ export function apply(ctx: any): void {
     const button = findLoadOlderButton(scrollport)
     if (!button) return
     if (button.disabled) {
-      if (timer) timer.timeout(() => loadAllOlder(scrollport), 150)
+      later(() => loadAllOlder(scrollport), 150)
       return
     }
     suppressScrollCount += 1
@@ -257,7 +293,21 @@ export function apply(ctx: any): void {
   function NavigationRail(props: any): any {
     const current = props.useSessions ? props.useSessions((state: any) => state.current) : undefined
     const [visible, setVisible] = React.useState(false)
+    const [clickCount, setClickCount] = React.useState(0)
     const railRef = React.useRef<HTMLElement | null>(null)
+
+    // Auto-hide: each appearance lasts AUTO_HIDE_MS, and a click restarts that
+    // countdown so the rail stays while it is actually being used.
+    React.useEffect(() => {
+      if (!visible) return
+      const handle = window.setTimeout(() => setVisible(false), AUTO_HIDE_MS)
+      return () => window.clearTimeout(handle)
+    }, [visible, clickCount])
+
+    const run = (action: () => void): void => {
+      setClickCount((count) => count + 1)
+      action()
+    }
 
     React.useLayoutEffect(() => {
       if (!current || !visible) return
@@ -312,8 +362,7 @@ export function apply(ctx: any): void {
       }
 
       tick()
-      if (!timer) return
-      const stop = timer.interval(tick, POSITION_SAMPLE_MS)
+      const stop = every(tick, POSITION_SAMPLE_MS)
       return () => {
         stop()
         if (attachedScrollport && onScroll) attachedScrollport.removeEventListener('scroll', onScroll)
@@ -327,10 +376,10 @@ export function apply(ctx: any): void {
       'aria-label': '会话导航',
       ref: railRef,
     },
-    React.createElement(NavButton, { title: '回到顶部', direction: 'up', double: true, onClick: scrollToTop }),
-    React.createElement(NavButton, { title: '上一个', direction: 'up', double: false, onClick: scrollToPrevious }),
-    React.createElement(NavButton, { title: '下一个', direction: 'down', double: false, onClick: scrollToNext }),
-    React.createElement(NavButton, { title: '回到底部', direction: 'down', double: true, onClick: scrollToBottom }))
+    React.createElement(NavButton, { title: '回到顶部', direction: 'up', double: true, onClick: () => run(scrollToTop) }),
+    React.createElement(NavButton, { title: '上一个', direction: 'up', double: false, onClick: () => run(scrollToPrevious) }),
+    React.createElement(NavButton, { title: '下一个', direction: 'down', double: false, onClick: () => run(scrollToNext) }),
+    React.createElement(NavButton, { title: '回到底部', direction: 'down', double: true, onClick: () => run(scrollToBottom) }))
   }
 
   slots.inject('shell.overlay', () => slots.register(
