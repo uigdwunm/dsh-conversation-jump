@@ -15,14 +15,21 @@ dsh plugin --profile web add dsh-conversation-jump
 # 重启 dsh web 后生效
 ```
 
-### 本地构建安装
+### 从 GitHub 安装（未发布 npm 时）
 
 ```sh
-# 在仓库根目录构建
-pnpm --filter dsh-conversation-jump build
+dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
+# 重启 dsh web 后生效
+```
+
+### 本地开发安装
+
+```sh
+npm install
+npm run build
 
 # 安装到 web profile（重启 dsh web 后生效）
-dsh plugin --profile web add file:./packages/dsh-conversation-jump
+dsh plugin --profile web add file:/绝对路径/dsh-conversation-jump
 ```
 
 ## 能力
@@ -46,7 +53,6 @@ npm 上 `dsh-conversation-nav` 这一名称已由其他作者占用（非本仓�
 
 ```sh
 npm login                      # 需要 npm 账号
-cd packages/dsh-conversation-jump
 npm publish                    # prepublishOnly 会自动执行构建
 ```
 
