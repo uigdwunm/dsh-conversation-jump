@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # From the prebuilt release tarball (nothing to build locally)
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.2/dsh-conversation-jump-0.1.2.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.3/dsh-conversation-jump-0.1.3.tgz
 ```
 
 Restart `dsh web` afterwards.
@@ -133,7 +133,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # 从预构建 Release 包安装（无需本地构建）
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.2/dsh-conversation-jump-0.1.2.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.3/dsh-conversation-jump-0.1.3.tgz
 ```
 
 安装后重启 `dsh web` 生效。

@@ -35,8 +35,8 @@ const CSS = `
   .dsh-conv-nav__button {
     display: grid;
     place-items: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     cursor: pointer;
     color: var(--dsw-alias-label-primary);
@@ -284,7 +284,7 @@ export function apply(ctx: any): void {
     else points = ['6 9 12 15 18 9']
 
     return React.createElement('svg', {
-      viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none',
+      viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none',
       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round',
       strokeLinejoin: 'round', 'aria-hidden': true,
     }, points.map((value) => React.createElement('polyline', { key: value, points: value })))
