@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-export const name = 'dsh-conversation-nav-client'
+export const name = 'dsh-conversation-jump-client'
 export const inject: string[] = []
 
 const SHOW_UP_SPEED_PX_PER_SECOND = 200
@@ -57,7 +57,7 @@ export function apply(ctx: any): void {
     style.textContent = CSS
     document.head.appendChild(style)
     return () => style.remove()
-  }, 'dsh-conversation-nav: styles')
+  }, 'dsh-conversation-jump: styles')
 
   function setScrollTop(el: HTMLElement, value: number): void {
     suppressScrollCount += 1
@@ -334,7 +334,7 @@ export function apply(ctx: any): void {
   }
 
   slots.inject('shell.overlay', () => slots.register(
-    { name: 'shell.overlay', id: 'dsh-conversation-nav', order: 0 },
+    { name: 'shell.overlay', id: 'dsh-conversation-jump', order: 0 },
     NavigationRail,
   ))
 }

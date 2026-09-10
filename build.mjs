@@ -9,7 +9,7 @@ await build({
   bundle: true,
   external: ['@deepseek-ai/*', 'react'],
   banner: {
-    js: 'window.__ModuleLoader__.load({ id: "dsh-conversation-nav", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+    js: 'window.__ModuleLoader__.load({ id: "dsh-conversation-jump", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
   },
   footer: {
     js: 'return module.exports; } });',

@@ -1,4 +1,4 @@
-# dsh-conversation-nav bundle: mount the conversation navigation UI plugin.
+# dsh-conversation-jump bundle: mount the conversation jump UI plugin.
 - insert:
-    - id: dsh-conversation-nav
-      name: 'dsh-conversation-nav'
+    - id: dsh-conversation-jump
+      name: 'dsh-conversation-jump'

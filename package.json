@@ -1,8 +1,16 @@
 {
-  "name": "dsh-conversation-nav",
+  "name": "dsh-conversation-jump",
   "version": "0.1.0",
-  "description": "为 DSH Web 对话区提供回到顶部、上一条用户消息、下一条用户消息、回到底部的圆形导航按钮，自动处理更早历史分页。Circular conversation navigation controls for DSH Web.",
-  "keywords": ["dsh", "dsh-plugin", "conversation", "navigation", "chat", "ui", "deepseek-harness"],
+  "description": "为 DSH Web 对话区提供回到顶部、上一条用户消息、下一条用户消息、回到底部的圆形导航按钮，自动处理更早历史分页。Circular jump controls that step through a DSH Web conversation one user message at a time.",
+  "keywords": ["dsh", "dsh-plugin", "conversation", "navigation", "jump", "chat", "ui", "deepseek-harness"],
+  "homepage": "https://github.com/uigdwunm/dsh-conversation-jump#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uigdwunm/dsh-conversation-jump.git"
+  },
+  "bugs": {
+    "url": "https://github.com/uigdwunm/dsh-conversation-jump/issues"
+  },
   "type": "module",
   "main": "./index.mjs",
   "exports": {
