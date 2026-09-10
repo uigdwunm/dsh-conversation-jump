@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # From the prebuilt release tarball (nothing to build locally)
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.1/dsh-conversation-jump-0.1.1.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.2/dsh-conversation-jump-0.1.2.tgz
 ```
 
 Restart `dsh web` afterwards.
@@ -52,7 +52,7 @@ dsh plugin --profile web add file:/absolute/path/dsh-conversation-jump
 | Message anchor | The target message settles about `1/12` down from the top of the viewport |
 | When it appears | Hidden by default; appears when the average upward scroll speed exceeds `200 px/s`, hides again as soon as you scroll down |
 | Auto-hide | Disappears `5 s` after appearing; clicking any button restarts that countdown |
-| Position | Aligned to the right edge of the conversation and `16 px` above the composer, positioned synchronously before paint so it does not flash |
+| Position | Aligned to the right edge of the conversation and `12 px` above the composer, positioned synchronously before paint so it does not flash |
 | State | Page-memory only — nothing persisted |
 
 Button labels are Chinese (`回到顶部` / `上一个` / `下一个` / `回到底部`); each button carries the same text as both its `title` and `aria-label`, and the rail is a `role="toolbar"` labelled `会话导航`.
@@ -133,7 +133,7 @@ dsh plugin --profile web add dsh-conversation-jump
 dsh plugin --profile web add github:uigdwunm/dsh-conversation-jump
 
 # 从预构建 Release 包安装（无需本地构建）
-dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.1/dsh-conversation-jump-0.1.1.tgz
+dsh plugin --profile web add https://github.com/uigdwunm/dsh-conversation-jump/releases/download/v0.1.2/dsh-conversation-jump-0.1.2.tgz
 ```
 
 安装后重启 `dsh web` 生效。
@@ -161,7 +161,7 @@ dsh plugin --profile web add file:/绝对路径/dsh-conversation-jump
 | 消息锚点 | 目标消息停在视口上方约 `1/12` 处 |
 | 显示策略 | 默认隐藏；往上平均速度超过 `200 px/s` 时显示，往下滚动立即隐藏 |
 | 自动隐藏 | 出现后 `5 秒`无点击自动消失；点击任一按钮重新计时 |
-| 定位 | 对齐对话内容右缘、输入框上方 `16 px`；绘制前同步定位以避免闪动 |
+| 定位 | 对齐对话内容右缘、输入框上方 `12 px`；绘制前同步定位以避免闪动 |
 | 状态 | 仅页面内存状态，不做持久化 |
 
 ### 实现说明
