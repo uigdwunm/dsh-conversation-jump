@@ -35,8 +35,8 @@ const CSS = `
   .dsh-conv-nav__button {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 26px;
     padding: 0;
     cursor: pointer;
     color: var(--dsw-alias-label-primary);
