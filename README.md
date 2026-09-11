@@ -41,6 +41,8 @@ npm run build
 dsh plugin --profile web add file:/absolute/path/dsh-conversation-jump
 ```
 
+A rebuild alone does not reach the running page. The profile keeps its own copy under `~/.dsh/profiles/<profile>/node_modules/`, and `npm run build` replaces `lib/client.js` by rename — which breaks the hard link the install created. Re-run the `dsh plugin … add file:…` command after each build (or copy the built file into that package) and then reload the page.
+
 ## Capabilities
 
 | Capability | Behaviour |
@@ -149,6 +151,8 @@ npm run build
 # 安装到 web profile，重启 dsh web 后生效
 dsh plugin --profile web add file:/绝对路径/dsh-conversation-jump
 ```
+
+**只重新构建不会让运行中的页面生效。** profile 在 `~/.dsh/profiles/<profile>/node_modules/` 下保存自己的一份副本，而 `npm run build` 是用「改名替换」的方式写 `lib/client.js`，会切断安装时建立的硬链接。因此每次构建后都要重新执行一次上面的 `dsh plugin … add file:…`（或把构建产物复制进 profile 里的那个包），再刷新页面。
 
 ### 能力
 
