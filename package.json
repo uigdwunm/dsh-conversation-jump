@@ -1,6 +1,6 @@
 {
   "name": "dsh-conversation-jump",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Circular jump controls that step through a DSH Web conversation one user message at a time, paging older history in automatically. 为 DSH Web 对话区提供上一条/下一条用户消息、回到顶部/底部的圆形导航按钮，并自动处理更早历史分页。",
   "keywords": ["dsh", "dsh-plugin", "conversation", "navigation", "jump", "chat", "ui", "deepseek-harness"],
   "homepage": "https://github.com/uigdwunm/dsh-conversation-jump#readme",

@@ -14,7 +14,7 @@ const SHOW_UP_SPEED_PX_PER_SECOND = 200
 const POSITION_SAMPLE_MS = 100
 const MESSAGE_ANCHOR_DIVISOR = 12
 const POSITION_EPSILON_PX = 4
-const AUTO_HIDE_MS = 5000
+const AUTO_HIDE_MS = 3000
 
 const CSS = `
   .dsh-conv-nav {
