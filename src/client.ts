@@ -35,8 +35,8 @@ const CSS = `
   .dsh-conv-nav__button {
     display: grid;
     place-items: center;
-    width: 24px;
-    height: 24px;
+    width: 34px;
+    height: 34px;
     padding: 0;
     cursor: pointer;
     color: var(--dsw-alias-label-primary);
@@ -155,7 +155,7 @@ export function apply(ctx: any): void {
     const right = flow
       ? Math.max(12, window.innerWidth - flow.getBoundingClientRect().right)
       : 12
-    const bottom = composer ? composer.offsetHeight + 12 : 164
+    const bottom = composer ? composer.offsetHeight + 16 : 168
     rail.style.right = `${right}px`
     rail.style.bottom = `${bottom}px`
   }
@@ -284,7 +284,7 @@ export function apply(ctx: any): void {
     else points = ['6 9 12 15 18 9']
 
     return React.createElement('svg', {
-      viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none',
+      viewBox: '0 0 24 24', width: 18, height: 18, fill: 'none',
       stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round',
       strokeLinejoin: 'round', 'aria-hidden': true,
     }, points.map((value) => React.createElement('polyline', { key: value, points: value })))
