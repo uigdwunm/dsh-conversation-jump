@@ -14,7 +14,14 @@ const SHOW_UP_SPEED_PX_PER_SECOND = 200
 const POSITION_SAMPLE_MS = 100
 const MESSAGE_ANCHOR_DIVISOR = 12
 const POSITION_EPSILON_PX = 4
+/** How long a reader input still counts as the cause of the scrolls that follow it. */
+const READER_INTENT_MS = 500
+/** How long the scroll events of this plugin's own write still belong to it. */
+const SELF_WRITE_MS = 150
 const AUTO_HIDE_MS = 3000
+const LOAD_OLDER_RETRY_MS = 150
+const LOAD_OLDER_RETRY_LIMIT = 200
+const PREVIOUS_PAGE_LIMIT = 40
 
 const CSS = `
   .dsh-conv-nav {
@@ -60,7 +67,12 @@ export function apply(ctx: any): void {
   const slots = ctx.get('slots')
   if (!slots) return
 
-  let suppressScrollCount = 0
+  /** True while this plugin drives the host's "load older" control and its page has not landed yet. */
+  let paging = false
+  /** True while that drive is the "to top" loop, which keeps paging until the real top. */
+  let toTop = false
+  /** Timestamp until which incoming scroll events are this plugin's own writes. */
+  let selfWriteUntil = 0
   const pendingTimeouts = new Set<number>()
   const pendingIntervals = new Set<number>()
 
@@ -112,10 +124,29 @@ export function apply(ctx: any): void {
     }
   }
 
+  /**
+   * Move the scrollport ourselves. The reader asked for this jump, so it is
+   * announced as reader intent first: the host otherwise keeps the paging anchor it
+   * retained for a history load and re-applies it, which silently undoes the landing
+   * and reads as a dead button.
+   *
+   * The host attributes a move to the reader only on a sampled scroll, and it
+   * samples 500ms late. While a turn streams, its "follow the tail" intent re-lands
+   * the viewport on the floor at every content commit, so that sample would always
+   * see the floor: follow is never released and the jump is reverted — the button
+   * reads as dead until a real wheel scroll clears follow. Arming the sampler with a
+   * scroll event and settling it with scrollend samples the move right now, while
+   * this position is current, so the host clears follow instead of fighting it.
+   */
   function setScrollTop(el: HTMLElement, value: number): void {
-    suppressScrollCount += 1
+    announceReaderIntent(el)
     el.scrollTop = value
-    later(() => { suppressScrollCount = Math.max(0, suppressScrollCount - 1) }, 100)
+    // Our own movement is not the reader scrolling: the rail must not retire on it,
+    // even when a real wheel happened moments before (its intent window is longer
+    // than this one).
+    selfWriteUntil = Date.now() + SELF_WRITE_MS
+    el.dispatchEvent(new Event('scroll'))
+    el.dispatchEvent(new Event('scrollend'))
   }
 
   function findScrollport(): HTMLElement | null {
@@ -160,80 +191,160 @@ export function apply(ctx: any): void {
     rail.style.bottom = `${bottom}px`
   }
 
-  function pollLoadOlder(scrollport: HTMLElement, onDone: () => void): void {
+  function pollLoadOlder(scrollport: HTMLElement, onDone: (grew: boolean) => void): void {
     const before = scrollport.querySelectorAll('[data-chat-anchor-key]').length
     let attempts = 0
     const stop = every(() => {
       attempts += 1
-      const after = scrollport.querySelectorAll('[data-chat-anchor-key]').length
-      if (after > before || attempts >= 60) {
+      const grew = scrollport.querySelectorAll('[data-chat-anchor-key]').length > before
+      if (grew || attempts >= 60) {
         stop()
-        later(onDone, 60)
+        later(() => onDone(grew), 60)
       }
     }, 100)
   }
 
+  /**
+   * Wait until the host's paging lane is free, then run `then`. The host ignores a
+   * "load older" click while a request of its own is already in flight — its button
+   * is disabled and reads 加载中… — and this plugin holds the same lane while it
+   * pages. A step that arrives in that window is not dropped; it waits and runs.
+   * Bounded twice over: the wait gives up rather than poll a host that never comes
+   * back, and it never re-arms itself.
+   */
+  function whenLaneFree(scrollport: HTMLElement, then: () => void): void {
+    let attempts = 0
+    const attempt = (): void => {
+      attempts += 1
+      const button = findLoadOlderButton(scrollport)
+      if (!paging && (button === null || !button.disabled)) { then(); return }
+      if (attempts < LOAD_OLDER_RETRY_LIMIT) later(attempt, LOAD_OLDER_RETRY_MS)
+    }
+    later(attempt, LOAD_OLDER_RETRY_MS)
+  }
+
+  /**
+   * Announce reader intent on the scrollport. While an older page loads, the host
+   * retains the row that was under the viewport as its paging anchor and re-applies
+   * it as that page's content changes size — measured passes one and four to seven
+   * seconds after the page lands, each of them far below the top this loop had set.
+   * It drops that anchor only for a reading intent on the scrollport (`wheel`,
+   * `touchstart`, `pointerdown`, the scroll keys, `beforematch`), and a programmatic
+   * scroll is none of them, so the correction would otherwise win however long this
+   * plugin fought it. The reader did ask for this jump, so a wheel is exactly what
+   * happened; the host's intent handler never checks `isTrusted`.
+   */
+  function announceReaderIntent(scrollport: HTMLElement): void {
+    scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true }))
+  }
+
   function loadAllOlder(scrollport: HTMLElement): void {
+    // A "previous", "next" or "to bottom" step supersedes an in-flight "to top"
+    // jump: stop paging there.
+    if (!toTop) { paging = false; return }
     setScrollTop(scrollport, 0)
     const button = findLoadOlderButton(scrollport)
-    if (!button) return
+    if (!button) { paging = false; toTop = false; return }
     if (button.disabled) {
-      later(() => loadAllOlder(scrollport), 150)
+      later(() => loadAllOlder(scrollport), LOAD_OLDER_RETRY_MS)
       return
     }
-    suppressScrollCount += 1
+    paging = true
     button.click()
-    pollLoadOlder(scrollport, () => {
-      suppressScrollCount = Math.max(0, suppressScrollCount - 1)
-      loadAllOlder(scrollport)
-    })
+    // The click begins the host's paging ownership; release it before that page
+    // lands, or its anchor restore lands the reader mid-history instead of on top.
+    announceReaderIntent(scrollport)
+    pollLoadOlder(scrollport, () => loadAllOlder(scrollport))
   }
 
   function scrollToTop(): void {
     const scrollport = findScrollport()
     if (!scrollport) return
+    toTop = true
     loadAllOlder(scrollport)
   }
 
   function scrollToBottom(): void {
+    // An explicit "to bottom" supersedes an in-flight "to top" jump.
+    toTop = false
     const scrollport = findScrollport()
     if (scrollport) setScrollTop(scrollport, scrollport.scrollHeight)
   }
 
-  function scrollToPreviousAfterLoad(scrollport: HTMLElement, priorOldestKey: string | null): void {
-    const messages = ownMessages(scrollport)
-    if (messages.length === 0) return
-    let priorOldestIndex = 0
-    if (priorOldestKey !== null) {
-      const found = messages.findIndex((message) => message.dataset.chatAnchorKey === priorOldestKey)
-      if (found >= 0) priorOldestIndex = found
-    }
-    const target = messages[Math.max(0, priorOldestIndex - 1)]
+  /** Put the own message at `index` on the anchor line. */
+  function landOnOwnMessage(scrollport: HTMLElement, index: number): void {
+    const target = ownMessages(scrollport)[index]
+    if (!target) return
     setScrollTop(
       scrollport,
       Math.max(0, scrollport.scrollTop + target.getBoundingClientRect().top - anchorOf(scrollport)),
     )
   }
 
-  function tryLoadOlder(scrollport: HTMLElement): boolean {
+  /**
+   * Index of the own message a "previous" step should land on, or -1 while the
+   * message before the reader is still outside the loaded window. Without a
+   * reference message the reader sits after everything loaded, so the newest own
+   * message is the one to land on; a reference that is gone falls back the same way.
+   */
+  function previousIndex(scrollport: HTMLElement, referenceKey: string | null): number {
+    const messages = ownMessages(scrollport)
+    if (messages.length === 0) return -1
+    if (referenceKey === null) return messages.length - 1
+    const at = messages.findIndex((message) => message.dataset.chatAnchorKey === referenceKey)
+    return at < 0 ? messages.length - 1 : at - 1
+  }
+
+  /**
+   * Page older history in until the user message before `referenceKey` is loaded,
+   * then land on it. The host pages by node count — 50 per request — while a single
+   * agent turn routinely spans more than that, so a page that adds no user message
+   * at all is normal. Landing right after such a page would put the view back where
+   * it started and read as "the button did nothing"; `hops` bounds the search. When
+   * the reference is already the oldest loaded message and the host has nothing
+   * left, the oldest one is the best landing there is.
+   */
+  function loadPrevious(scrollport: HTMLElement, referenceKey: string | null, hops: number): boolean {
     const button = findLoadOlderButton(scrollport)
-    if (!button || button.disabled) return false
-    const priorOldestKey = ownMessages(scrollport)[0]?.dataset.chatAnchorKey ?? null
+    if (!button) return false
+    if (button.disabled || paging) {
+      whenLaneFree(scrollport, () => scrollToPrevious())
+      return true
+    }
     setScrollTop(scrollport, 0)
-    suppressScrollCount += 1
+    paging = true
     button.click()
-    pollLoadOlder(scrollport, () => {
-      suppressScrollCount = Math.max(0, suppressScrollCount - 1)
-      scrollToPreviousAfterLoad(scrollport, priorOldestKey)
+    // Same ownership as the "to top" loop: this page lands on a row the host would
+    // otherwise drag back to the reading anchor it retained for the page load.
+    announceReaderIntent(scrollport)
+    pollLoadOlder(scrollport, (grew) => {
+      paging = false
+      const index = previousIndex(scrollport, referenceKey)
+      if (index >= 0) { landOnOwnMessage(scrollport, index); return }
+      if (grew && hops < PREVIOUS_PAGE_LIMIT && loadPrevious(scrollport, referenceKey, hops + 1)) return
+      landOnOwnMessage(scrollport, 0)
     })
     return true
   }
 
+  function tryLoadOlder(scrollport: HTMLElement): boolean {
+    const referenceKey = ownMessages(scrollport)[0]?.dataset.chatAnchorKey ?? null
+    return loadPrevious(scrollport, referenceKey, 0)
+  }
+
   function scrollToPrevious(): void {
+    // A "previous" step supersedes an in-flight "to top" jump.
+    toTop = false
     const scrollport = findScrollport()
     if (!scrollport) return
     const messages = ownMessages(scrollport)
-    if (messages.length === 0) return
+    if (messages.length === 0) {
+      // One agent turn can span more nodes than a host page, so the loaded window
+      // may hold no user message at all — the reader's own question is still
+      // outside it. Page older history in until one shows up.
+      tryLoadOlder(scrollport)
+      return
+    }
 
     const anchor = anchorOf(scrollport)
     let target: HTMLElement | null = null
@@ -244,9 +355,15 @@ export function apply(ctx: any): void {
       }
     }
 
-    if (target === null || target === messages[0]) {
+    // Page older history in only when there is no own message above the anchor at
+    // all. An own message that merely happens to be the oldest *loaded* one is still
+    // this step's target: landing on it is the step, and paging first would lock onto
+    // the message before it (loadPrevious lands on `reference - 1`) and skip the
+    // reader's question by one.
+    if (target === null) {
       if (tryLoadOlder(scrollport)) return
-      if (target === null) { setScrollTop(scrollport, 0); return }
+      setScrollTop(scrollport, 0)
+      return
     }
 
     setScrollTop(
@@ -256,6 +373,9 @@ export function apply(ctx: any): void {
   }
 
   function scrollToNext(): void {
+    // A "next" step supersedes an in-flight "to top" jump, whose pending page would
+    // otherwise scroll back to the top right after this step moved the viewport.
+    toTop = false
     const scrollport = findScrollport()
     if (!scrollport) return
     const messages = ownMessages(scrollport)
@@ -305,19 +425,42 @@ export function apply(ctx: any): void {
     }, React.createElement(Chevron, { direction: props.direction, double: props.double }))
   }
 
+  /**
+   * The session the main view shows, or undefined when no conversation is open.
+   * DSH 0.1.x published it as the sessions store's `current` field; 0.2 dropped
+   * that field and marks the session its main view retains instead, which is how
+   * the shipped client derives the same id. Reading only `current` would leave
+   * the rail permanently unrendered on 0.2, since the gate below rejects
+   * undefined.
+   */
+  function currentSessionId(state: any): string | undefined {
+    if (typeof state?.current === 'string' && state.current !== '') return state.current
+    const rows = state?.byId
+    if (!rows || typeof rows !== 'object') return undefined
+    for (const [id, row] of Object.entries<any>(rows)) {
+      if (((row?.retainedBy?.mainView) ?? 0) > 0) return id
+    }
+    return undefined
+  }
+
   function NavigationRail(props: any): any {
-    const current = props.useSessions ? props.useSessions((state: any) => state.current) : undefined
+    const current = props.useSessions ? props.useSessions(currentSessionId) : undefined
     const [visible, setVisible] = React.useState(false)
     const [clickCount, setClickCount] = React.useState(0)
+    const [hovered, setHovered] = React.useState(false)
     const railRef = React.useRef<HTMLElement | null>(null)
+    /** When the reader last drove the viewport themselves (wheel, touch, keys). */
+    const readerIntentAt = React.useRef(0)
 
     // Auto-hide: each appearance lasts AUTO_HIDE_MS, and a click restarts that
-    // countdown so the rail stays while it is actually being used.
+    // countdown so the rail stays while it is actually being used. A pointer on the
+    // rail counts as use — hiding it under a reader who is reaching for a button is
+    // how a click ends up on the conversation instead.
     React.useEffect(() => {
-      if (!visible) return
+      if (!visible || hovered) return
       const handle = window.setTimeout(() => setVisible(false), AUTO_HIDE_MS)
       return () => window.clearTimeout(handle)
-    }, [visible, clickCount])
+    }, [visible, clickCount, hovered])
 
     const run = (action: () => void): void => {
       setClickCount((count) => count + 1)
@@ -338,6 +481,7 @@ export function apply(ctx: any): void {
 
       let attachedScrollport: HTMLElement | null = null
       let onScroll: (() => void) | null = null
+      let onIntent: ((event: Event) => void) | null = null
       let lastTop = 0
       let previousTop = 0
       let previousTime = 0
@@ -349,7 +493,14 @@ export function apply(ctx: any): void {
         const rail = railRef.current
 
         if (attachedScrollport !== scrollport) {
-          if (attachedScrollport && onScroll) attachedScrollport.removeEventListener('scroll', onScroll)
+          if (attachedScrollport) {
+            if (onScroll) attachedScrollport.removeEventListener('scroll', onScroll)
+            if (onIntent) {
+              attachedScrollport.removeEventListener('wheel', onIntent)
+              attachedScrollport.removeEventListener('touchmove', onIntent)
+              attachedScrollport.removeEventListener('keydown', onIntent)
+            }
+          }
           attachedScrollport = scrollport
           lastTop = scrollport.scrollTop
           onScroll = () => {
@@ -357,9 +508,26 @@ export function apply(ctx: any): void {
             const top = attachedScrollport.scrollTop
             const delta = top - lastTop
             lastTop = top
-            if (suppressScrollCount === 0 && delta > 0) setVisible(false)
+            if (Date.now() < selfWriteUntil) return
+            // Only the reader's own scrolling retires the rail. This plugin's jumps and
+            // the host's own corrections (its paging anchor lands a second or more after
+            // a page commits) also move the viewport down, and hiding on those took the
+            // buttons away mid-use: the next click had nothing left to hit.
+            if (delta > 0 && readerIntentAt.current !== 0 && Date.now() - readerIntentAt.current < READER_INTENT_MS) {
+              setVisible(false)
+            }
           }
+          onIntent = (event: Event) => {
+            // Only real input counts: this plugin dispatches a wheel to claim its own
+            // jumps from the host, and that must not be read as the reader scrolling.
+            if (!event.isTrusted) return
+            readerIntentAt.current = Date.now()
+          }
+          const intent = onIntent
           scrollport.addEventListener('scroll', onScroll, { passive: true })
+          scrollport.addEventListener('wheel', intent, { passive: true })
+          scrollport.addEventListener('touchmove', intent, { passive: true })
+          scrollport.addEventListener('keydown', intent)
           previousTop = scrollport.scrollTop
           previousTime = Date.now()
         }
@@ -393,6 +561,8 @@ export function apply(ctx: any): void {
       role: 'toolbar',
       'aria-label': '会话导航',
       ref: railRef,
+      onPointerEnter: () => setHovered(true),
+      onPointerLeave: () => setHovered(false),
     },
     React.createElement(NavButton, { title: '回到顶部', direction: 'up', double: true, onClick: () => run(scrollToTop) }),
     React.createElement(NavButton, { title: '上一个', direction: 'up', double: false, onClick: () => run(scrollToPrevious) }),
